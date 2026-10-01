@@ -1,0 +1,4 @@
+backend-fastapi/venv/
+backend-fastapi/__pycache__/
+dashboard-vue/node_modules/
+dashboard-vue/dist/
