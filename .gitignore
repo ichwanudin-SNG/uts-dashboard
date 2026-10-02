@@ -1,0 +1,4 @@
+dashboard-vue/node_modules/
+dashboard-vue/.vite/
+__pycache__/
+*.pyc
