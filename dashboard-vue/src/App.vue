@@ -1,78 +1,56 @@
 <template>
-  <div class="wadah">
-    <h1>📋 Daftar Barang Inventaris</h1>
+  <div style="padding: 20px; font-family: Arial;">
+    <h1>📚 Dashboard Perpustakaan</h1>
 
-    <!-- Ringkasan -->
-    <div class="ringkasan">
-      <div class="kotak">
-        <h3>Total Barang</h3>
-        <p>{{ totalBarang }}</p>
+    <div style="display: flex; gap: 20px; margin: 20px 0;">
+      <div class="kartu">
+        <h3>Total Buku</h3>
+        <p>{{ bukuList.length }}</p>
       </div>
-      <div class="kotak">
-        <h3>Stok Menipis + Habis</h3>
-        <p>{{ stokMenipisDanHabis }}</p>
+      <div class="kartu">
+        <h3>Stok Menipis</h3>
+        <p>{{ bukuList.filter(b => b.stok <= 3).length }}</p>
       </div>
-      <div class="kotak">
-        <h3>Jumlah Kategori</h3>
-        <p>{{ jumlahKategori }}</p>
-      </div>
-      <div class="kotak">
-        <h3>Total Unit</h3>
-        <p>{{ totalUnit }}</p>
+      <div class="kartu">
+        <h3>Total Eksemplar</h3>
+        <p>{{ bukuList.reduce((s, b) => s + b.stok, 0) }}</p>
       </div>
     </div>
 
-    <!-- Pencarian & Urutan -->
-    <div class="kontrol">
-      <input
-        v-model="kataKunci"
-        type="text"
-        placeholder="Cari nama barang / penanggung jawab..."
-      />
-      <select v-model="urutan">
-        <option value="">Urutkan...</option>
-        <option value="az">Nama A-Z</option>
-        <option value="za">Nama Z-A</option>
-        <option value="stokBanyak">Stok Terbanyak</option>
-        <option value="stokSedikit">Stok Tersedikit</option>
+    <div style="margin: 20px 0;">
+      <input v-model="cari" placeholder="Cari judul/penulis..." style="padding: 8px; width: 250px;">
+      <select v-model="urutan" style="padding: 8px; margin-left: 8px;">
+        <option value="az">Urut A-Z</option>
+        <option value="za">Urut Z-A</option>
+        <option value="stok">Stok Terbanyak</option>
       </select>
     </div>
 
-    <!-- Form Tambah -->
-    <div class="form-tambah">
-      <input v-model="baru.nama" type="text" placeholder="Nama Barang" />
-      <input v-model="baru.penanggung_jawab" type="text" placeholder="Penanggung Jawab" />
-      <input v-model="baru.kategori" type="text" placeholder="Kategori" />
-      <input v-model.number="baru.stok" type="number" placeholder="Jumlah Stok" min="0" />
-      <button @click="kirimBarang" class="btn-tambah">+ Tambah</button>
+    <div style="margin: 20px 0; display: flex; gap: 8px;">
+      <input v-model="baru.judul" placeholder="Judul" style="padding: 8px; flex: 1;">
+      <input v-model="baru.penulis" placeholder="Penulis" style="padding: 8px; flex: 1;">
+      <input v-model="baru.kategori" placeholder="Kategori" style="padding: 8px; flex: 1;">
+      <input v-model.number="baru.stok" type="number" placeholder="Stok" style="padding: 8px; width: 100px;">
+      <button @click="tambahBuku" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px;">+ Tambah</button>
     </div>
 
-    <!-- Tabel -->
-    <table>
+    <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; margin-top: 20px;">
       <thead>
-        <tr>
-          <th>Nama Barang</th>
-          <th>Penanggung Jawab</th>
+        <tr style="background: #f0f0f0;">
+          <th>Judul</th>
+          <th>Penulis</th>
           <th>Kategori</th>
           <th>Stok</th>
-          <th>Status</th>
           <th>Aksi</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in daftarTampil" :key="item.id">
-          <td>{{ item.nama }}</td>
-          <td>{{ item.penanggung_jawab }}</td>
-          <td>{{ item.kategori }}</td>
-          <td class="stok" :class="kelasStatus(item.stok)">{{ item.stok }}</td>
-          <td>
-            <span class="badge" :class="kelasStatus(item.stok)">
-              {{ ambilStatus(item.stok) }}
-            </span>
-          </td>
-          <td>
-            <button @click="hapusData(item.id)" class="btn-hapus">Hapus</button>
-          </td>
+        <tr v-for="buku in bukuTampil" :key="buku.id">
+          <td>{{ buku.judul }}</td>
+          <td>{{ buku.penulis }}</td>
+          <td>{{ buku.kategori }}</td>
+          <td :style="{ color: buku.stok <= 3 ? 'red' : 'green' }">{{ buku.stok }}</td>
+          <td><button @click="hapusBuku(buku.id)" style="color: red; border: none; background: none; cursor: pointer;">Hapus</button></td>
         </tr>
       </tbody>
     </table>
@@ -82,201 +60,52 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 
-// Alamat backend
-const ALAMAT = 'http://localhost:8000/barang'
+// === PENTING: Pilih SATU alamat di bawah ini ===
+// Kalau pakai 127.0.0.1 di browser, pakai yang ini:
+const ALAMAT = 'http://127.0.0.1:8000/buku'
+// Kalau pakai localhost di browser, pakai yang ini:
+// const ALAMAT = 'http://localhost:8000/buku'
 
-// Data
-const daftarBarang = ref([])
-const kataKunci = ref('')
-const urutan = ref('')
-const baru = ref({ nama: '', penanggung_jawab: '', kategori: '', stok: 0 })
+const bukuList = ref([])
+const cari = ref('')
+const urutan = ref('az')
+const baru = ref({ judul: '', penulis: '', kategori: '', stok: 1 })
 
-// Ambil data dari backend
 const ambilData = async () => {
   try {
     const res = await fetch(ALAMAT)
-    daftarBarang.value = await res.json()
-  } catch {
-    alert('Gagal ambil data! Pastikan backend menyala di http://127.0.0.1:8000/barang')
-    daftarBarang.value = []
+    bukuList.value = await res.json()
+  } catch (e) {
+    alert('Gagal ambil data! Pastikan backend menyala di ' + ALAMAT)
   }
 }
 
-// Tentukan status & warna
-const ambilStatus = (stok) => {
-  if (stok === 0) return 'Habis'
-  if (stok <= 3) return 'Menipis'
-  return 'Aman'
-}
-
-const kelasStatus = (stok) => {
-  if (stok === 0) return 'habis'
-  if (stok <= 3) return 'menipis'
-  return 'aman'
-}
-
-// Filter & urut
-const daftarTampil = computed(() => {
-  let hasil = [...daftarBarang.value]
-
-  // Cari
-  if (kataKunci.value) {
-    const kunci = kataKunci.value.toLowerCase()
-    hasil = hasil.filter(b =>
-      b.nama.toLowerCase().includes(kunci) ||
-      b.penanggung_jawab.toLowerCase().includes(kunci)
-    )
-  }
-
-  // Urut
-  if (urutan.value === 'az') {
-    hasil.sort((a, b) => a.nama.localeCompare(b.nama))
-  } else if (urutan.value === 'za') {
-    hasil.sort((a, b) => b.nama.localeCompare(a.nama))
-  } else if (urutan.value === 'stokBanyak') {
-    hasil.sort((a, b) => b.stok - a.stok)
-  } else if (urutan.value === 'stokSedikit') {
-    hasil.sort((a, b) => a.stok - b.stok)
-  }
-
-  return hasil
-})
-
-// 4 Hitungan ringkasan (pakai computed)
-const totalBarang = computed(() => daftarBarang.value.length)
-
-const stokMenipisDanHabis = computed(() => {
-  return daftarBarang.value.filter(b => b.stok <= 3).length
-})
-
-const jumlahKategori = computed(() => {
-  const unik = new Set(daftarBarang.value.map(b => b.kategori))
-  return unik.size
-})
-
-const totalUnit = computed(() => {
-  return daftarBarang.value.reduce((jumlah, b) => jumlah + b.stok, 0)
-})
-
-// Tambah barang
-const kirimBarang = async () => {
-  if (!baru.value.nama || !baru.value.penanggung_jawab || !baru.value.kategori) {
-    alert('Lengkapi semua data!')
-    return
-  }
+const tambahBuku = async () => {
+  if (!baru.value.judul) return
   await fetch(ALAMAT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(baru.value)
   })
-  baru.value = { nama: '', penanggung_jawab: '', kategori: '', stok: 0 }
-  await ambilData()
+  baru.value = { judul: '', penulis: '', kategori: '', stok: 1 }
+  ambilData()
 }
 
-// Hapus barang
-const hapusData = async (id) => {
-  if (!confirm('Yakin ingin menghapus?')) return
+const hapusBuku = async (id) => {
   await fetch(`${ALAMAT}/${id}`, { method: 'DELETE' })
-  await ambilData()
+  ambilData()
 }
+
+const bukuTampil = computed(() => {
+  let hasil = bukuList.value.filter(b =>
+    b.judul.toLowerCase().includes(cari.value.toLowerCase()) ||
+    b.penulis.toLowerCase().includes(cari.value.toLowerCase())
+  )
+  if (urutan.value === 'az') hasil.sort((a, b) => a.judul.localeCompare(b.judul))
+  if (urutan.value === 'za') hasil.sort((a, b) => b.judul.localeCompare(a.judul))
+  if (urutan.value === 'stok') hasil.sort((a, b) => b.stok - a.stok)
+  return hasil
+})
 
 onMounted(ambilData)
 </script>
-
-<style scoped>
-.wadah {
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-  font-family: Arial, sans-serif;
-}
-h1 {
-  text-align: center;
-  color: #2c3e50;
-}
-.ringkasan {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.kotak {
-  background: #ecf0f1;
-  padding: 1rem;
-  border-radius: 8px;
-  text-align: center;
-}
-.kotak h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-  color: #34495e;
-}
-.kotak p {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #2980b9;
-}
-.kontrol {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-.kontrol input, .kontrol select {
-  flex: 1;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-.form-tambah {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-.form-tambah input {
-  flex: 1;
-  min-width: 150px;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-button {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.btn-tambah {
-  background: #27ae60;
-  color: white;
-}
-.btn-hapus {
-  background: #e74c3c;
-  color: white;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th, td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-th {
-  background: #f8f8f8;
-}
-.stok.aman { color: #27ae60; font-weight: bold; }
-.stok.menipis { color: #f39c12; font-weight: bold; }
-.stok.habis { color: #e74c3c; font-weight: bold; }
-.badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  color: white;
-}
-.badge.aman { background: #27ae60; }
-.badge.menipis { background: #f39c12; }
-.badge.habis { background: #e74c3c; }
-</style>
